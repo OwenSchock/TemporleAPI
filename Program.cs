@@ -84,6 +84,26 @@ app.MapGet("/api/leaderboard", async (AppDbContext db, string mode = "endless") 
     }
 });
 
+// --- GLOBAL STATS ENDPOINT ---
+app.MapGet("/api/globalstats", async (AppDbContext db) =>
+{
+    try
+    {
+        // Calculate the average guess count for all successful Daily runs
+        var globalAverage = await db.PlayerRuns
+            .Where(r => r.GameMode == "daily" && r.IsWin == true)
+            .AverageAsync(r => (double?)r.GuessCount) ?? 0.0;
+
+        return Results.Ok(new { 
+            averageGuesses = Math.Round(globalAverage, 2) 
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to fetch global stats: {ex.Message}");
+    }
+});
+
 app.Run();
 
 // --- DATABASE MODELS ---
