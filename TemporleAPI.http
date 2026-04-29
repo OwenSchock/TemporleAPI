@@ -1,0 +1,6 @@
+@TemporleAPI_HostAddress = http://localhost:5281
+
+GET {{TemporleAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

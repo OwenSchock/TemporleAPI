@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "dgSpecHash": "mMwxvamX2AQ=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\owens\\Downloads\\GamesIMade\\Temporle Live\\TemporleAPI\\TemporleAPI.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\owens\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.4\\microsoft.aspnetcore.openapi.10.0.4.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.4\\microsoft.entityframeworkcore.10.0.4.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.4\\microsoft.entityframeworkcore.abstractions.10.0.4.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.4\\microsoft.entityframeworkcore.analyzers.10.0.4.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\microsoft.entityframeworkcore.relational\\10.0.4\\microsoft.entityframeworkcore.relational.10.0.4.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\nettopologysuite\\2.6.0\\nettopologysuite.2.6.0.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\nettopologysuite.io.postgis\\2.1.0\\nettopologysuite.io.postgis.2.1.0.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\npgsql\\10.0.2\\npgsql.10.0.2.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\npgsql.entityframeworkcore.postgresql\\10.0.1\\npgsql.entityframeworkcore.postgresql.10.0.1.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\npgsql.entityframeworkcore.postgresql.nettopologysuite\\10.0.1\\npgsql.entityframeworkcore.postgresql.nettopologysuite.10.0.1.nupkg.sha512",
+    "C:\\Users\\owens\\.nuget\\packages\\npgsql.nettopologysuite\\10.0.2\\npgsql.nettopologysuite.10.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}
