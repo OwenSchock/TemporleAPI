@@ -8,7 +8,14 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAll", policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
-var connectionString = "Host=db.sdemibvbmwigtzsnlglu.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=t-C!J%e$uvX69R6;"; 
+// The API will now look for a secure Environment Variable inside Render
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
+
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new Exception("CRITICAL: Database connection string is missing!");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, o => o.UseNetTopologySuite()));
 
