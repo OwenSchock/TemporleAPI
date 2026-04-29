@@ -55,6 +55,33 @@ app.MapPost("/api/telemetry", async (RunTelemetry runData, AppDbContext db) =>
     return Results.Ok(new { message = "Run logged successfully!" });
 });
 
+// --- GLOBAL LEADERBOARD ENDPOINT ---
+app.MapGet("/api/leaderboard", async (AppDbContext db, string mode = "endless") =>
+{
+    try
+    {
+        // Query the database for the top 10 winning runs
+        var topRuns = await db.PlayerRuns
+            .Where(r => r.GameMode == mode && r.IsWin == true)
+            // Sort by least guesses, then by highest remaining health
+            .OrderBy(r => r.GuessCount)
+            .ThenByDescending(r => r.RemainingHealth)
+            .Take(10)
+            .Select(r => new {
+                guesses = r.GuessCount,
+                health = r.RemainingHealth,
+                date = r.PlayedAt
+            })
+            .ToListAsync();
+
+        return Results.Ok(topRuns);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to fetch leaderboard: {ex.Message}");
+    }
+});
+
 app.Run();
 
 // --- DATABASE MODELS ---
