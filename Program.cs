@@ -60,16 +60,18 @@ app.MapGet("/api/leaderboard", async (AppDbContext db, string mode = "endless") 
 {
     try
     {
-        // Query the database for the top 10 winning runs
         var topRuns = await db.PlayerRuns
-            .Where(r => r.GameMode == mode && r.IsWin == true)
-            // Sort by least guesses, then by highest remaining health
-            .OrderBy(r => r.GuessCount)
-            .ThenByDescending(r => r.RemainingHealth)
+            // Endless runs end on a loss. 
+            // We ensure RemainingHealth (Depth) is > 0 so we don't pull your old test data!
+            .Where(r => r.GameMode == mode && r.IsWin == false && r.RemainingHealth > 0)
+            // 1st Priority: Highest Depth (Hijacked Health Column)
+            .OrderByDescending(r => r.RemainingHealth)
+            // Tiebreaker: Fewest Total Guesses
+            .ThenBy(r => r.GuessCount)
             .Take(10)
             .Select(r => new {
+                depth = r.RemainingHealth,
                 guesses = r.GuessCount,
-                health = r.RemainingHealth,
                 date = r.PlayedAt
             })
             .ToListAsync();
