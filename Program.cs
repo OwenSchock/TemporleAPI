@@ -84,15 +84,26 @@ app.MapGet("/api/leaderboard", async (AppDbContext db, string mode = "endless") 
     }
 });
 
-// --- GLOBAL STATS ENDPOINT ---
+// --- GLOBAL STATS ENDPOINT (TODAY ONLY) ---
 app.MapGet("/api/globalstats", async (AppDbContext db) =>
 {
     try
     {
-        // Calculate the average guess count for all successful Daily runs
-        var globalAverage = await db.PlayerRuns
-            .Where(r => r.GameMode == "daily" && r.IsWin == true)
-            .AverageAsync(r => (double?)r.GuessCount) ?? 0.0;
+        // Get midnight today (UTC)
+        var today = DateTime.UtcNow.Date;
+
+        // Calculate the average guess count for successful Daily runs that happened TODAY
+        var todayRuns = db.PlayerRuns
+            .Where(r => r.GameMode == "daily" && r.IsWin == true && r.PlayedAt >= today);
+
+        // We have to check if anyone has actually played today yet to avoid a divide-by-zero error!
+        var count = await todayRuns.CountAsync();
+        
+        double globalAverage = 0.0;
+        if (count > 0)
+        {
+            globalAverage = await todayRuns.AverageAsync(r => (double?)r.GuessCount) ?? 0.0;
+        }
 
         return Results.Ok(new { 
             averageGuesses = Math.Round(globalAverage, 2) 
