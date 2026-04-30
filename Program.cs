@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,6 +117,47 @@ app.MapGet("/api/globalstats", async (AppDbContext db) =>
     }
 });
 
+// --- GET PLAYER PROFILE ---
+app.MapGet("/api/profile/{userId}", async (Guid userId, AppDbContext db) =>
+{
+    try
+    {
+        var profile = await db.PlayerProfiles.FindAsync(userId);
+        return profile is not null ? Results.Ok(profile.StatsJson) : Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to fetch profile: {ex.Message}");
+    }
+});
+
+// --- SAVE PLAYER PROFILE ---
+app.MapPost("/api/profile", async (PlayerProfile incomingProfile, AppDbContext db) =>
+{
+    try
+    {
+        var existingProfile = await db.PlayerProfiles.FindAsync(incomingProfile.UserId);
+        
+        if (existingProfile is null)
+        {
+            // First time saving, create new row
+            db.PlayerProfiles.Add(incomingProfile);
+        }
+        else
+        {
+            // Returning player, update existing stats
+            existingProfile.StatsJson = incomingProfile.StatsJson;
+        }
+        
+        await db.SaveChangesAsync();
+        return Results.Ok(new { message = "Cloud sync successful" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to sync profile: {ex.Message}");
+    }
+});
+
 app.Run();
 
 // --- DATABASE MODELS ---
@@ -124,6 +167,7 @@ public class AppDbContext : DbContext
     
     public DbSet<Country> Countries { get; set; }
     public DbSet<RunTelemetry> PlayerRuns { get; set; } // Added the new table
+    public DbSet<PlayerProfile> PlayerProfiles { get; set; } // New table for player profiles
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -162,4 +206,19 @@ public class RunTelemetry
     public int GuessCount { get; set; }
     public int RemainingHealth { get; set; }
     public DateTime PlayedAt { get; set; }
+}
+
+// Add this right below RunTelemetry
+[Table("player_profiles")]
+public class PlayerProfile
+{
+    [Key]
+    [Column("user_id")]
+    public Guid UserId { get; set; }
+
+    [Column("stats_json", TypeName = "jsonb")]
+    public string StatsJson { get; set; } = "{}";
+
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
