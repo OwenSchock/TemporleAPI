@@ -123,7 +123,9 @@ app.MapGet("/api/profile/{userId}", async (Guid userId, AppDbContext db) =>
     try
     {
         var profile = await db.PlayerProfiles.FindAsync(userId);
-        return profile is not null ? Results.Ok(profile.StatsJson) : Results.NotFound();
+        return profile is not null 
+            ? Results.Ok(new { statsJson = profile.StatsJson, storyJson = profile.StoryJson }) 
+            : Results.NotFound();
     }
     catch (Exception ex)
     {
@@ -147,6 +149,7 @@ app.MapPost("/api/profile", async (PlayerProfile incomingProfile, AppDbContext d
         {
             // Returning player, update existing stats
             existingProfile.StatsJson = incomingProfile.StatsJson;
+            existingProfile.StoryJson = incomingProfile.StoryJson; // <-- NEW: Save the Story!
         }
         
         await db.SaveChangesAsync();
@@ -218,6 +221,10 @@ public class PlayerProfile
 
     [Column("stats_json", TypeName = "jsonb")]
     public string StatsJson { get; set; } = "{}";
+
+    // --- NEW: The Campaign Vault ---
+    [Column("story_json", TypeName = "jsonb")]
+    public string StoryJson { get; set; } = "{}";
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
