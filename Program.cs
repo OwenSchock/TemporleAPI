@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,10 +45,9 @@ app.MapGet("/api/distance", async (string guess, string target, AppDbContext db)
     return Results.Ok(new { distanceKm = Math.Round(distance) });
 });
 
-// ENDPOINT 2: The Telemetry Catcher (NEW!)
+// ENDPOINT 2: The Telemetry Catcher (Unchanged)
 app.MapPost("/api/telemetry", async (RunTelemetry runData, AppDbContext db) =>
 {
-    // PostgreSQL handles the 'played_at' timestamp automatically, so we let the DB handle the time
     runData.PlayedAt = DateTime.UtcNow; 
     
     db.PlayerRuns.Add(runData);
@@ -58,18 +56,14 @@ app.MapPost("/api/telemetry", async (RunTelemetry runData, AppDbContext db) =>
     return Results.Ok(new { message = "Run logged successfully!" });
 });
 
-// --- GLOBAL LEADERBOARD ENDPOINT ---
+// --- GLOBAL LEADERBOARD ENDPOINT (Unchanged) ---
 app.MapGet("/api/leaderboard", async (AppDbContext db, string mode = "endless") =>
 {
     try
     {
         var topRuns = await db.PlayerRuns
-            // Endless runs end on a loss. 
-            // We ensure RemainingHealth (Depth) is > 0 so we don't pull your old test data!
             .Where(r => r.GameMode == mode && r.IsWin == false && r.RemainingHealth > 0)
-            // 1st Priority: Highest Depth (Hijacked Health Column)
             .OrderByDescending(r => r.RemainingHealth)
-            // Tiebreaker: Fewest Total Guesses
             .ThenBy(r => r.GuessCount)
             .Take(10)
             .Select(r => new {
@@ -87,19 +81,15 @@ app.MapGet("/api/leaderboard", async (AppDbContext db, string mode = "endless") 
     }
 });
 
-// --- GLOBAL STATS ENDPOINT (TODAY ONLY) ---
+// --- GLOBAL STATS ENDPOINT (Unchanged) ---
 app.MapGet("/api/globalstats", async (AppDbContext db) =>
 {
     try
     {
-        // Get midnight today (UTC)
         var today = DateTime.UtcNow.Date;
-
-        // Calculate the average guess count for successful Daily runs that happened TODAY
         var todayRuns = db.PlayerRuns
             .Where(r => r.GameMode == "daily" && r.IsWin == true && r.PlayedAt >= today);
 
-        // We have to check if anyone has actually played today yet to avoid a divide-by-zero error!
         var count = await todayRuns.CountAsync();
         
         double globalAverage = 0.0;
@@ -108,9 +98,7 @@ app.MapGet("/api/globalstats", async (AppDbContext db) =>
             globalAverage = await todayRuns.AverageAsync(r => (double?)r.GuessCount) ?? 0.0;
         }
 
-        return Results.Ok(new { 
-            averageGuesses = Math.Round(globalAverage, 2) 
-        });
+        return Results.Ok(new { averageGuesses = Math.Round(globalAverage, 2) });
     }
     catch (Exception ex)
     {
@@ -118,7 +106,7 @@ app.MapGet("/api/globalstats", async (AppDbContext db) =>
     }
 });
 
-// --- GET PLAYER PROFILE ---
+// --- GET PLAYER PROFILE (Unchanged) ---
 app.MapGet("/api/profile/{userId}", async (Guid userId, AppDbContext db) =>
 {
     try
@@ -134,7 +122,7 @@ app.MapGet("/api/profile/{userId}", async (Guid userId, AppDbContext db) =>
     }
 });
 
-// --- SAVE PLAYER PROFILE ---
+// --- SAVE PLAYER PROFILE (Unchanged) ---
 app.MapPost("/api/profile", async (PlayerProfile incomingProfile, AppDbContext db) =>
 {
     try
@@ -143,14 +131,12 @@ app.MapPost("/api/profile", async (PlayerProfile incomingProfile, AppDbContext d
         
         if (existingProfile is null)
         {
-            // First time saving, create new row
             db.PlayerProfiles.Add(incomingProfile);
         }
         else
         {
-            // Returning player, update existing stats
             existingProfile.StatsJson = incomingProfile.StatsJson;
-            existingProfile.StoryJson = incomingProfile.StoryJson; // <-- NEW: Save the Story!
+            existingProfile.StoryJson = incomingProfile.StoryJson; 
         }
         
         await db.SaveChangesAsync();
@@ -162,20 +148,29 @@ app.MapPost("/api/profile", async (PlayerProfile incomingProfile, AppDbContext d
     }
 });
 
+
+// ==========================================
+// FIX: THE NEW ARCADE ENDPOINTS (USING EF CORE)
+// ==========================================
+
 // GET: Top 10 Scores
-app.MapGet("/api/anomaly/top10", async (Supabase.Client _supabase) =>
+app.MapGet("/api/anomaly/top10", async (AppDbContext db) =>
 {
-    var response = await _supabase.From<AnomalyScoreModel>()
-        .Select("initials, score, created_at")
-        .Order("score", Supabase.Postgrest.Constants.Ordering.Descending)
-        .Limit(10)
-        .Get();
+    var topScores = await db.AnomalyLeaderboard
+        .OrderByDescending(s => s.Score)
+        .Take(10)
+        .Select(s => new { 
+            initials = s.Initials, 
+            score = s.Score, 
+            created_at = s.CreatedAt 
+        })
+        .ToListAsync();
         
-    return Results.Ok(response.Models);
+    return Results.Ok(topScores);
 });
 
 // POST: Submit New Score
-app.MapPost("/api/anomaly/submit", async (SubmitScoreDto request, Supabase.Client _supabase) =>
+app.MapPost("/api/anomaly/submit", async (SubmitScoreDto request, AppDbContext db) =>
 {
     if (string.IsNullOrWhiteSpace(request.Initials) || request.Initials.Length > 3)
         return Results.BadRequest("Invalid Initials. Must be 3 characters.");
@@ -186,32 +181,39 @@ app.MapPost("/api/anomaly/submit", async (SubmitScoreDto request, Supabase.Clien
         Score = request.Score 
     };
 
-    var response = await _supabase.From<AnomalyScoreModel>().Insert(newScore);
-    return Results.Ok(response.Models.FirstOrDefault());
+    db.AnomalyLeaderboard.Add(newScore);
+    await db.SaveChangesAsync();
+    
+    return Results.Ok(newScore);
 });
 
 app.Run();
 
-// --- DATABASE MODELS ---
+
+// ==========================================
+// DATABASE MODELS & CONTEXT
+// ==========================================
+
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     
     public DbSet<Country> Countries { get; set; }
-    public DbSet<RunTelemetry> PlayerRuns { get; set; } // Added the new table
-    public DbSet<PlayerProfile> PlayerProfiles { get; set; } // New table for player profiles
+    public DbSet<RunTelemetry> PlayerRuns { get; set; } 
+    public DbSet<PlayerProfile> PlayerProfiles { get; set; } 
+    
+    // FIX: Add the new Arcade Leaderboard to your existing Context
+    public DbSet<AnomalyScoreModel> AnomalyLeaderboard { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("postgis"); 
         
-        // Map Countries
         modelBuilder.Entity<Country>().ToTable("countries");
         modelBuilder.Entity<Country>().Property(c => c.Id).HasColumnName("id");
         modelBuilder.Entity<Country>().Property(c => c.Name).HasColumnName("name");
         modelBuilder.Entity<Country>().Property(c => c.Geom).HasColumnName("geom");
 
-        // Map Player Runs (NEW!)
         modelBuilder.Entity<RunTelemetry>().ToTable("player_runs");
         modelBuilder.Entity<RunTelemetry>().Property(r => r.Id).HasColumnName("id");
         modelBuilder.Entity<RunTelemetry>().Property(r => r.GameMode).HasColumnName("game_mode");
@@ -225,22 +227,20 @@ public class AppDbContext : DbContext
 public class Country
 {
     public int Id { get; set; }
-    public string Name { get; set; }
-    public MultiPolygon Geom { get; set; }
+    public string Name { get; set; } = string.Empty; // Added default to fix warning
+    public MultiPolygon Geom { get; set; } = null!; // Added default to fix warning
 }
 
-// The new Telemetry Model
 public class RunTelemetry
 {
     public int Id { get; set; }
-    public string GameMode { get; set; }
+    public string GameMode { get; set; } = string.Empty; // Added default to fix warning
     public bool IsWin { get; set; }
     public int GuessCount { get; set; }
     public int RemainingHealth { get; set; }
     public DateTime PlayedAt { get; set; }
 }
 
-// Add this right below RunTelemetry
 [Table("player_profiles")]
 public class PlayerProfile
 {
@@ -251,7 +251,6 @@ public class PlayerProfile
     [Column("stats_json", TypeName = "jsonb")]
     public string StatsJson { get; set; } = "{}";
 
-    // --- NEW: The Campaign Vault ---
     [Column("story_json", TypeName = "jsonb")]
     public string StoryJson { get; set; } = "{}";
 
@@ -259,28 +258,26 @@ public class PlayerProfile
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-// --- ANOMALY ARCADE DATA MODELS ---
-
-// 1. The blueprint for the incoming payload from JavaScript
+// FIX: EF Core Model for the Arcade Leaderboard
 public class SubmitScoreDto
 {
     public string Initials { get; set; } = string.Empty;
     public int Score { get; set; }
 }
 
-// 2. The blueprint that maps exactly to your Supabase table
-[Supabase.Postgrest.Attributes.Table("anomaly_leaderboard")]
-public class AnomalyScoreModel : Supabase.Postgrest.Models.BaseModel
+[Table("anomaly_leaderboard")]
+public class AnomalyScoreModel
 {
-    [Supabase.Postgrest.Attributes.PrimaryKey("id", false)]
-    public string Id { get; set; } = string.Empty;
+    [Key]
+    [Column("id")]
+    public Guid Id { get; set; }
 
-    [Supabase.Postgrest.Attributes.Column("initials")]
+    [Column("initials")]
     public string Initials { get; set; } = string.Empty;
 
-    [Supabase.Postgrest.Attributes.Column("score")]
+    [Column("score")]
     public int Score { get; set; }
 
-    [Supabase.Postgrest.Attributes.Column("created_at")]
-    public DateTime CreatedAt { get; set; }
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
