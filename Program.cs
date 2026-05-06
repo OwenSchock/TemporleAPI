@@ -161,6 +161,34 @@ app.MapPost("/api/profile", async (PlayerProfile incomingProfile, AppDbContext d
     }
 });
 
+// GET: Top 10 Scores
+app.MapGet("/api/anomaly/top10", async (Supabase.Client _supabase) =>
+{
+    var response = await _supabase.From<AnomalyScoreModel>()
+        .Select("initials, score, created_at")
+        .Order("score", Supabase.Postgrest.Constants.Ordering.Descending)
+        .Limit(10)
+        .Get();
+        
+    return Results.Ok(response.Models);
+});
+
+// POST: Submit New Score
+app.MapPost("/api/anomaly/submit", async (SubmitScoreDto request, Supabase.Client _supabase) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Initials) || request.Initials.Length > 3)
+        return Results.BadRequest("Invalid Initials. Must be 3 characters.");
+
+    var newScore = new AnomalyScoreModel 
+    { 
+        Initials = request.Initials.ToUpper(), 
+        Score = request.Score 
+    };
+
+    var response = await _supabase.From<AnomalyScoreModel>().Insert(newScore);
+    return Results.Ok(response.Models.FirstOrDefault());
+});
+
 app.Run();
 
 // --- DATABASE MODELS ---
