@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -256,4 +257,30 @@ public class PlayerProfile
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// --- ANOMALY ARCADE DATA MODELS ---
+
+// 1. The blueprint for the incoming payload from JavaScript
+public class SubmitScoreDto
+{
+    public string Initials { get; set; } = string.Empty;
+    public int Score { get; set; }
+}
+
+// 2. The blueprint that maps exactly to your Supabase table
+[Supabase.Postgrest.Attributes.Table("anomaly_leaderboard")]
+public class AnomalyScoreModel : Supabase.Postgrest.Models.BaseModel
+{
+    [Supabase.Postgrest.Attributes.PrimaryKey("id", false)]
+    public string Id { get; set; } = string.Empty;
+
+    [Supabase.Postgrest.Attributes.Column("initials")]
+    public string Initials { get; set; } = string.Empty;
+
+    [Supabase.Postgrest.Attributes.Column("score")]
+    public int Score { get; set; }
+
+    [Supabase.Postgrest.Attributes.Column("created_at")]
+    public DateTime CreatedAt { get; set; }
 }
